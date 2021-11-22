@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"reflect"
+	"strconv"
 	"time"
 
 	"github.com/cem-okulmus/BalancedGo/lib"
@@ -13,7 +14,10 @@ import (
 
 var graph string
 var width int
+var gml string
 var enum int
+var complete bool
+var shrink string
 
 var start time.Time
 var durs []time.Duration
@@ -29,6 +33,12 @@ func main() {
 		panic(err)
 	}
 	hg, _ := lib.GetGraph(string(dat))
+	originalGraph := hg
+
+	var addedVertices []int
+	if complete {
+		addedVertices = hg.MakeEdgesDistinct()
+	}
 
 	stop := make(chan bool)
 	defer close(stop)
@@ -39,10 +49,20 @@ func main() {
 	start = time.Now()
 	for decomp := range solver.Stream(stop) {
 		durs = append(durs, time.Since(start))
-		if !reflect.DeepEqual(decomp, Decomp{}) {
-			decomp.Graph = hg
+		if complete {
+			decomp.Root.RemoveVertices(addedVertices)
 		}
-		outputStanza("DetKStreamer", decomp, durs, hg, "", width, false)
+		if !reflect.DeepEqual(decomp, Decomp{}) {
+			decomp.Graph = originalGraph
+		}
+		if shrink != "" {
+			decomp = Shrink(decomp, shrink)
+		}
+		var gmlSeq string
+		if gml != "" {
+			gmlSeq = gml + "_" + strconv.Itoa(i) + ".gml"
+		}
+		outputStanza("DetKStreamer", decomp, durs, originalGraph, gmlSeq, width, false)
 		fmt.Print("\n\n")
 		i++
 		if enum > 0 && i == enum {
@@ -106,7 +126,10 @@ func setFlags() {
 
 	flagSet.StringVar(&graph, "graph", "", "Hypergraph to decompose (for format see hyperbench.dbai.tuwien.ac.at/downloads/manual.pdf)")
 	flagSet.IntVar(&width, "width", 0, "Width of the decomposition to search for (width > 0)")
+	flagSet.StringVar(&gml, "gml", "", "Output the produced decomposition into the specified gml file")
 	flagSet.IntVar(&enum, "enum", 0, "Number of decompositions to output (default => all; enum > 0 => min(all, enum))")
+	flagSet.BoolVar(&complete, "complete", false, "Forces the computation of complete decompositions")
+	flagSet.StringVar(&shrink, "shrink", "", "Remove redundant nodes from the produced decomposition (default => none; soft => bag,cover subsets; hard => bag subsets)")
 
 	parseError := flagSet.Parse(os.Args[1:])
 	if parseError != nil {
@@ -141,6 +164,10 @@ func setFlags() {
 			out += fmt.Sprintln("\t" + f.Usage)
 		})
 		fmt.Fprintln(os.Stderr, out)
+
+		if shrink != "" && shrink != soft && shrink != hard {
+			panic(fmt.Errorf("shrink must be either", soft, "or", hard))
+		}
 
 		os.Exit(1)
 	}
