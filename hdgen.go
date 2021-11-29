@@ -18,6 +18,8 @@ var gml string
 var enum int
 var complete bool
 var shrink string
+var evaldb string
+var evaljoin string
 
 var start time.Time
 var durs []time.Duration
@@ -32,8 +34,14 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	hg, _ := lib.GetGraph(string(dat))
+	hg, parsedGraph := lib.GetGraph(string(dat))
 	originalGraph := hg
+
+	var ev Evaluator
+	if evaljoin != "" {
+		estimates := LoadEstimates(evaljoin, hg, parsedGraph.Encoding)
+		ev = EstimateEvaluator{sizes: estimates}
+	}
 
 	var addedVertices []int
 	if complete {
@@ -62,7 +70,7 @@ func main() {
 		if gml != "" {
 			gmlSeq = gml + "_" + strconv.Itoa(i) + ".gml"
 		}
-		outputStanza("DetKStreamer", decomp, durs, originalGraph, gmlSeq, width, false)
+		outputStanza("DetKStreamer", i, decomp, ev, durs, originalGraph, gmlSeq, width, false)
 		fmt.Print("\n\n")
 		i++
 		if enum > 0 && i == enum {
@@ -74,7 +82,13 @@ func main() {
 		durs = append(durs, time.Since(start))
 	}
 
-	fmt.Println("Search ended in", sumDurations(durs), "ms.")
+	fmt.Println("Time Composition: ")
+	for _, t := range durs {
+		fmt.Print(t, "\t")
+	}
+	fmt.Println()
+
+	fmt.Println("\nSearch ended in", sumDurations(durs), "ms.")
 	fmt.Println(i, "decompositions were found.")
 }
 
@@ -86,25 +100,32 @@ func sumDurations(times []time.Duration) int64 {
 	return sumTotal
 }
 
-func outputStanza(algorithm string, decomp Decomp, times []time.Duration, graph Graph, gml string, K int, skipCheck bool) {
+func outputStanza(algorithm string, i int, decomp Decomp, ev Evaluator, times []time.Duration, graph Graph, gml string, K int, skipCheck bool) {
 	fmt.Println("Used algorithm: " + algorithm)
-	fmt.Println("Result ( ran with K =", K, ")\n", decomp)
+	fmt.Println("Result", i, "( ran with K =", K, ")\n", decomp)
 
 	// Print the times
 	sumTotal := sumDurations(times)
 	fmt.Printf("Time: %.5d ms\n", sumTotal)
 
-	fmt.Println("Time Composition: ")
+	/*fmt.Println("Time Composition: ")
 	for _, t := range times {
 		fmt.Println(t)
-	}
+	}*/
 
 	fmt.Println("\nWidth: ", decomp.CheckWidth())
 	var correct bool
 	if !skipCheck {
 		correct = decomp.Correct(graph)
+		if !correct {
+			panic("wrong decomposition!")
+		}
 	} else {
 		correct = true
+	}
+
+	if ev != nil {
+		fmt.Println("Cost: ", ev.Eval(decomp))
 	}
 
 	fmt.Println("Correct: ", correct)
@@ -130,6 +151,8 @@ func setFlags() {
 	flagSet.IntVar(&enum, "enum", 0, "Number of decompositions to output (default => all; enum > 0 => min(all, enum))")
 	flagSet.BoolVar(&complete, "complete", false, "Forces the computation of complete decompositions")
 	flagSet.StringVar(&shrink, "shrink", "", "Remove redundant nodes from the produced decomposition (default => none; soft => bag,cover subsets; hard => bag subsets)")
+	flagSet.StringVar(&evaldb, "evaldb", "", "Evaluate decompositions according to a given database") // TODO
+	flagSet.StringVar(&evaljoin, "evaljoin", "", "Evaluate decompositions according to given join estimates")
 
 	parseError := flagSet.Parse(os.Args[1:])
 	if parseError != nil {
@@ -166,7 +189,7 @@ func setFlags() {
 		fmt.Fprintln(os.Stderr, out)
 
 		if shrink != "" && shrink != soft && shrink != hard {
-			panic(fmt.Errorf("shrink must be either", soft, "or", hard))
+			panic(fmt.Errorf("shrink must be either %v or %v", soft, hard))
 		}
 
 		os.Exit(1)
