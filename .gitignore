@@ -1,4 +1,5 @@
-# ignore hypergraphs
+# ignore test data
+databases/
 hypergraphs/
 
 # ignore vscode debug files

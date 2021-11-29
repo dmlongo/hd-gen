@@ -116,13 +116,15 @@ func (d *DetKStreamer) advance() bool {
 		if found {
 			d.sTree.moveUp()
 			par := d.sTree.curr
-			if par != nil {
+			for par != nil {
 				for i := len(par.children); i < len(par.myComps); i++ {
 					Hc := par.myComps[i]
 					if !d.decompose(Hc, par.bag) {
 						panic(fmt.Errorf("one decomposition should exist"))
 					}
 				}
+				d.sTree.moveUp()
+				par = d.sTree.curr
 			}
 			break
 		}
@@ -139,6 +141,8 @@ type SearchNode struct {
 	bag      []int
 	myComps  []Graph
 
+	size int
+
 	parent   *SearchNode
 	children []*SearchNode
 }
@@ -149,7 +153,7 @@ type SearchTree struct {
 }
 
 func (tree *SearchTree) makeChild(H Graph, sepGen *SeparatorIt) *SearchNode {
-	n := &SearchNode{H: H, sepGen: sepGen}
+	n := &SearchNode{H: H, sepGen: sepGen, size: -1}
 	n.parent = tree.curr
 	if tree.root == nil {
 		tree.root = n
