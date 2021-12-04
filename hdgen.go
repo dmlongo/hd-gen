@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/cem-okulmus/BalancedGo/lib"
+	"github.com/dmlongo/hd-gen/db"
+	"github.com/dmlongo/hd-gen/decomp"
 )
 
 var graph string
@@ -37,10 +39,13 @@ func main() {
 	hg, parsedGraph := lib.GetGraph(string(dat))
 	originalGraph := hg
 
-	var ev Evaluator
-	if evaljoin != "" {
-		estimates := LoadEstimates(evaljoin, hg, parsedGraph.Encoding)
-		ev = EstimateEvaluator{sizes: estimates}
+	var ev decomp.Evaluator
+	if evaldb != "" {
+		db, e2t := db.Load(evaldb, parsedGraph)
+		ev = decomp.InformedEvaluator{Db: db, Edge2Table: e2t}
+	} else if evaljoin != "" {
+		estimates := decomp.LoadEstimates(evaljoin, hg, parsedGraph.Encoding)
+		ev = decomp.EstimateEvaluator{Sizes: estimates}
 	}
 
 	var addedVertices []int
@@ -51,26 +56,29 @@ func main() {
 	stop := make(chan bool)
 	defer close(stop)
 
-	solver := &DetKStreamer{K: width, Graph: hg}
+	//solver := &DetKStreamer{K: width, Graph: hg}
+	solver := &decomp.BnbDetKStreamer{K: width, Graph: hg, Ev: ev}
 	fmt.Println("Starting search...")
 	i := 0
 	start = time.Now()
-	for decomp := range solver.Stream(stop) {
+	for dec := range solver.Stream(stop) {
 		durs = append(durs, time.Since(start))
 		if complete {
-			decomp.Root.RemoveVertices(addedVertices)
+			dec.Root.RemoveVertices(addedVertices)
 		}
-		if !reflect.DeepEqual(decomp, Decomp{}) {
-			decomp.Graph = originalGraph
+		if !reflect.DeepEqual(dec, Decomp{}) {
+			dec.Graph = originalGraph
 		}
 		if shrink != "" {
-			decomp = Shrink(decomp, shrink)
+			tree := decomp.MakeSearchTree(dec)
+			tree.Shrink(shrink)
+			dec = decomp.MakeDecomp(*tree)
 		}
 		var gmlSeq string
 		if gml != "" {
 			gmlSeq = gml + "_" + strconv.Itoa(i) + ".gml"
 		}
-		outputStanza("DetKStreamer", i, decomp, ev, durs, originalGraph, gmlSeq, width, false)
+		outputStanza("DetKStreamer", i, dec, ev, durs, originalGraph, gmlSeq, width, false)
 		fmt.Print("\n\n")
 		i++
 		if enum > 0 && i == enum {
@@ -100,18 +108,13 @@ func sumDurations(times []time.Duration) int64 {
 	return sumTotal
 }
 
-func outputStanza(algorithm string, i int, decomp Decomp, ev Evaluator, times []time.Duration, graph Graph, gml string, K int, skipCheck bool) {
+func outputStanza(algorithm string, i int, decomp Decomp, ev decomp.Evaluator, times []time.Duration, graph Graph, gml string, K int, skipCheck bool) {
 	fmt.Println("Used algorithm: " + algorithm)
 	fmt.Println("Result", i, "( ran with K =", K, ")\n", decomp)
 
 	// Print the times
 	sumTotal := sumDurations(times)
 	fmt.Printf("Time: %.5d ms\n", sumTotal)
-
-	/*fmt.Println("Time Composition: ")
-	for _, t := range times {
-		fmt.Println(t)
-	}*/
 
 	fmt.Println("\nWidth: ", decomp.CheckWidth())
 	var correct bool
@@ -188,8 +191,12 @@ func setFlags() {
 		})
 		fmt.Fprintln(os.Stderr, out)
 
-		if shrink != "" && shrink != soft && shrink != hard {
-			panic(fmt.Errorf("shrink must be either %v or %v", soft, hard))
+		if shrink != "" && shrink != decomp.ShrinkSoftly && shrink != decomp.ShrinkHardly {
+			panic(fmt.Errorf("shrink must be either %v or %v", decomp.ShrinkSoftly, decomp.ShrinkHardly))
+		}
+
+		if evaldb != "" && evaljoin != "" {
+			panic(fmt.Errorf("choose only one between evaldb and evaljoin"))
 		}
 
 		os.Exit(1)

@@ -1,4 +1,4 @@
-package main
+package decomp
 
 import (
 	"fmt"
@@ -7,22 +7,87 @@ import (
 	"github.com/cem-okulmus/BalancedGo/lib"
 )
 
+type Decomp = lib.Decomp
+type Graph = lib.Graph
+
+type SearchNode struct {
+	hg       Graph
+	extVerts []int
+	sepGen   *DetKSeparatorIt
+	sep      lib.Edges
+	bag      []int
+	myComps  []Graph
+
+	size int
+
+	parent   *SearchNode
+	children []*SearchNode
+}
+
+type SearchTree struct {
+	root *SearchNode
+	curr *SearchNode
+}
+
+func (tree *SearchTree) MakeChild(hg Graph, sepGen *DetKSeparatorIt) *SearchNode {
+	n := &SearchNode{hg: hg, sepGen: sepGen, size: -1}
+	n.parent = tree.curr
+	if tree.root == nil {
+		tree.root = n
+	} else {
+		tree.curr.children = append(tree.curr.children, n)
+	}
+	tree.curr = n
+	return n
+}
+
+func (tree *SearchTree) RemoveChild() {
+	n := tree.curr
+	tree.curr = n.parent
+	if n.parent == nil {
+		tree.root = nil
+	} else {
+		ch := tree.curr.children
+		tree.curr.children = tree.curr.children[:len(ch)-1]
+	}
+	// TODO clean n, no memory waste
+}
+
+func (tree *SearchTree) MoveToParent() {
+	tree.curr = tree.curr.parent
+}
+
+func (tree *SearchTree) dfs() []*SearchNode {
+	var res []*SearchNode
+	var n *SearchNode
+	var open []*SearchNode
+	if tree.root != nil {
+		open = append(open, tree.root)
+	}
+	for len(open) > 0 {
+		n, open = open[len(open)-1], open[:len(open)-1]
+		res = append(res, n)
+		for i := range n.children {
+			open = append(open, n.children[len(n.children)-i-1])
+		}
+	}
+	return res
+}
+
 const (
-	soft = "soft"
-	hard = "hard"
+	ShrinkSoftly = "soft"
+	ShrinkHardly = "hard"
 )
 
-func Shrink(decomp Decomp, mode string) Decomp {
-	sTree := makeSearchTree(&decomp.Root)
-	nodes := sTree.dfs()
+func (tree *SearchTree) Shrink(mode string) {
+	nodes := tree.dfs()
 	for _, n := range nodes {
 		shrinkUp(n, mode)
 	}
-	nodes = sTree.dfs()
+	nodes = tree.dfs()
 	for i := len(nodes) - 1; i >= 0; i-- {
-		shrinkDown(sTree, nodes[i], mode)
+		shrinkDown(tree, nodes[i], mode)
 	}
-	return Decomp{Graph: decomp.Graph, Root: makeDecomp(sTree.root)}
 }
 
 func shrinkUp(n *SearchNode, mode string) {
@@ -88,12 +153,12 @@ func simplify(n1 *SearchNode, n2 *SearchNode, mode string) bool {
 		return true
 	case bagSub && !coverSub:
 		// join/semijoin case
-		if mode == hard {
+		if mode == ShrinkHardly {
 			// TODO if a sibling contains n1.sep, then you don't need to add
 			n2.sep = lib.NewEdges(append(n2.sep.Slice(), n1.sep.Slice()...))
 			n2.sep.RemoveDuplicates()
 		}
-		return mode == hard
+		return mode == ShrinkHardly
 	case !bagSub && coverSub:
 		// eliminate n1, expand bag
 		n2.bag = append(n2.bag, n1.bag...)
@@ -124,26 +189,57 @@ func posOf(n *SearchNode, nodes []*SearchNode) int {
 	return -1
 }
 
-func makeSearchTree(dRoot *lib.Node) *SearchTree {
-	tree := &SearchTree{}
-	copyTree(tree, dRoot)
-	return tree
-}
-
-func copyTree(tree *SearchTree, n *lib.Node) {
-	curr := tree.makeChild(Graph{}, nil)
-	curr.bag = n.Bag
-	curr.sep = n.Cover
-	for _, c := range n.Children {
-		copyTree(tree, &c)
-	}
-	tree.moveUp()
-}
-
 func toNameSlice(edges lib.Edges) []int {
 	var res []int
 	for _, e := range edges.Slice() {
 		res = append(res, e.Name)
 	}
 	return res
+}
+
+func (tree *SearchTree) Clone() *SearchTree {
+	res := &SearchTree{}
+	copyTree(res, *tree.root)
+	return res
+}
+
+func copyTree(tree *SearchTree, n SearchNode) {
+	curr := tree.MakeChild(n.hg, nil)
+	curr.bag = n.bag
+	curr.sep = n.sep
+	for _, c := range n.children {
+		copyTree(tree, *c)
+	}
+	tree.MoveToParent()
+}
+
+func MakeSearchTree(dec Decomp) *SearchTree {
+	tree := &SearchTree{}
+	copyDecomp(tree, &dec.Root)
+	tree.root.hg = dec.Graph
+	return tree
+}
+
+func copyDecomp(tree *SearchTree, n *lib.Node) {
+	curr := tree.MakeChild(Graph{}, nil)
+	curr.bag = n.Bag
+	curr.sep = n.Cover
+	for _, c := range n.Children {
+		copyDecomp(tree, &c)
+	}
+	tree.MoveToParent()
+}
+
+func MakeDecomp(tree SearchTree) Decomp {
+	return Decomp{Graph: tree.root.hg, Root: makeDecomp(tree.root)}
+}
+
+func makeDecomp(s *SearchNode) lib.Node {
+	n := lib.Node{Bag: s.bag, Cover: s.sep}
+	var subtrees []lib.Node
+	for _, c := range s.children {
+		subtrees = append(subtrees, makeDecomp(c))
+	}
+	n.Children = subtrees
+	return n
 }

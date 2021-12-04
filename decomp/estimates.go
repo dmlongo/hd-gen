@@ -1,4 +1,4 @@
-package main
+package decomp
 
 import (
 	"encoding/csv"

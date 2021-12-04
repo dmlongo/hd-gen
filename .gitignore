@@ -1,6 +1,5 @@
 # ignore test data
-databases/
-hypergraphs/
+examples/
 
 # ignore vscode debug files
 .vscode/

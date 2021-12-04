@@ -1,80 +1,43 @@
-package main
+package db
 
 import (
 	"container/heap"
 	"fmt"
 	"math"
-
-	"github.com/cem-okulmus/BalancedGo/lib"
 )
 
-type Evaluator interface {
-	Eval(decomp Decomp) int
+type Statistics struct {
+	attrs   []string
+	attrPos map[string]int
+
+	Size   int
+	Ndv    []int
+	Hgrams []Histogram
 }
 
-type InformedEvaluator struct {
-	db  Database
-	e2t map[int]string // edge -> table
-}
-
-func (qe InformedEvaluator) Eval(decomp Decomp) int {
-	cost := 0
-	var n *SearchNode
-	dfs := makeSearchTree(&decomp.Root).dfs()
-	for len(dfs) > 0 {
-		n, dfs = dfs[len(dfs)-1], dfs[:len(dfs)-1]
-		cost += qe.evalNode(n)
-		for _, child := range n.children {
-			cost += qe.evalEdge(n, child)
-		}
-	}
-	return cost
-}
-
-func (qe InformedEvaluator) evalNode(n *SearchNode) int {
-	if n.size == -1 {
-		jTables := qe.toTables(n.sep)
-		n.size = hJoinSize(jTables)
-	}
-	return n.size
-}
-
-func (qe InformedEvaluator) evalEdge(par *SearchNode, child *SearchNode) int {
-	if par.size == -1 || child.size == -1 {
-		panic("negative sizes")
-	}
-	if par.size == 0 || child.size == 0 {
-		return 0
+func NewStatistics(attrs []string) *Statistics {
+	if len(attrs) <= 0 {
+		panic(fmt.Errorf("%v is not valid", attrs))
 	}
 
-	parTables := qe.toTables(par.sep)
-	childTables := qe.toTables(child.sep)
-	if len(par.sep.Slice()) == 1 && len(child.sep.Slice()) == 1 {
-		return hSemijoinSize(parTables[0], childTables[0])
-	} // non funziona, non tengo conto che par puo' avere altri figli
-
-	// size_{child} = sel_{child} * par.size
-	// sel_{child} = (expected cardinality of q_{child}) / (prod of q_{child} tables)
-	num := child.size * par.size
-	den := 1
-	for _, t := range childTables {
-		den *= t.Size()
+	var stats Statistics
+	attrPos := make(map[string]int)
+	for i, v := range attrs {
+		attrPos[v] = i
 	}
-	return int(math.Round(float64(num) / float64(den)))
-	// I think there are smarter ways to do this
-}
+	stats.attrs = attrs
+	stats.attrPos = attrPos
 
-func (qe InformedEvaluator) toTables(edges lib.Edges) []Table {
-	var tables []Table
-	for _, e := range edges.Slice() {
-		tabName := qe.e2t[e.Name]
-		tables = append(tables, qe.db[tabName])
+	stats.Ndv = make([]int, len(attrs))
+	stats.Hgrams = make([]Histogram, len(attrs))
+	for i := range stats.Hgrams {
+		stats.Hgrams[i] = make(Histogram)
 	}
-	return tables
+	return &stats
 }
 
 // S = \sel_{A=c}(R), c constant
-func hSelectionSize(r Table, attr string, val int) int {
+func HgramSelectionSize(r Table, attr string, val string) int {
 	if i, ok := r.Position(attr); ok {
 		return r.hgrams[i].Frequency(val)
 	} else {
@@ -82,7 +45,7 @@ func hSelectionSize(r Table, attr string, val int) int {
 	}
 }
 
-func hSemijoinSize(r Table, s Table) int {
+func HgramSemijoinSize(r Table, s Table) int {
 	if r.Size() == 0 || s.Size() == 0 {
 		return 0
 	}
@@ -119,7 +82,7 @@ func semijoinSelectivity(attr string, r Table, s Table) (float64, bool) {
 	return num / float64(r.Size()), false
 }
 
-func hJoinSize(tables []Table) int {
+func HgramJoinSize(tables []Table) int {
 	if len(tables) == 1 {
 		return tables[0].Size()
 	}
@@ -183,61 +146,13 @@ func joinMatchingTuples(attr string, tables []Table) int {
 			temp *= tables[i].hgrams[idx[i]].Frequency(val)
 		}
 		n += temp
-		if n == 0 {
-			return 0
-		}
 	}
 
 	return n
 }
 
-type EstimateEvaluator struct {
-	sizes SizeEstimates
-}
-
-func (uqe EstimateEvaluator) Eval(decomp Decomp) int {
-	cost := 0
-	var n *SearchNode
-	dfs := makeSearchTree(&decomp.Root).dfs()
-	for len(dfs) > 0 {
-		n, dfs = dfs[len(dfs)-1], dfs[:len(dfs)-1]
-		cost += uqe.evalNode(n)
-		for _, child := range n.children {
-			cost += uqe.evalEdge(n, child)
-		}
-	}
-	return cost
-}
-
-func (uqe EstimateEvaluator) evalNode(n *SearchNode) int {
-	if n.size == -1 {
-		n.size = uqe.sizes.Cost(n.sep)
-	}
-	return n.size
-}
-
-func (uqe EstimateEvaluator) evalEdge(par *SearchNode, child *SearchNode) int {
-	if par.size == -1 || child.size == -1 {
-		panic("negative sizes")
-	}
-	if par.size == 0 || child.size == 0 {
-		return 0
-	}
-
-	// size_{child} = sel_{child} * par.size
-	// sel_{child} = (expected cardinality of q_{child}) / (prod of q_{child} tables)
-	num := child.size * par.size
-	den := 1
-	for _, t := range child.sep.Slice() {
-		den *= uqe.sizes.Cost(lib.NewEdges([]lib.Edge{t}))
-	}
-	res := int(math.Round(float64(num) / float64(den)))
-	par.size = res
-	return res
-}
-
 // S = \sel_{A=c}(R), c constant
-func uSelectionSize(r Table, attr string) int {
+func NaiveSelectionSize(r Table, attr string) int {
 	if i, ok := r.Position(attr); ok {
 		if r.Size() == 0 {
 			return 0
@@ -250,14 +165,14 @@ func uSelectionSize(r Table, attr string) int {
 	}
 }
 
-func uSemijoinSize(r Table, s Table) int {
+func NaiveSemijoinSize(r Table, s Table) int {
 	res := r.Size()
 	// TODO
 	return res
 }
 
 // T(R \join S) = T(R)*T(S) / max(V(R,Y),V(S,Y))
-func uJoinSize(tables []Table) int {
+func NaiveJoinSize(tables []Table) int {
 	n := 1
 	for _, t := range tables {
 		n *= t.Size()
