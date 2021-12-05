@@ -8,6 +8,7 @@ import (
 
 type Streamer interface {
 	Stream(stop <-chan bool) <-chan Decomp
+	Name() string
 }
 
 type DetKStreamer struct {
@@ -16,6 +17,10 @@ type DetKStreamer struct {
 	sTree SearchTree
 
 	cache lib.Cache
+}
+
+func (d *DetKStreamer) Name() string {
+	return "EnumDetK"
 }
 
 func (d *DetKStreamer) Stream(stop <-chan bool) <-chan Decomp {
@@ -127,6 +132,10 @@ type BestDetKStreamer struct {
 	Ev   Evaluator
 }
 
+func (b *BestDetKStreamer) Name() string {
+	return "BestDetK"
+}
+
 func (b *BestDetKStreamer) Stream(stop <-chan bool) <-chan Decomp {
 	out := make(chan Decomp)
 	go func() {
@@ -157,6 +166,10 @@ type BnbDetKStreamer struct {
 	Ev         Evaluator
 	currDecomp Decomp
 	currCost   int
+}
+
+func (d *BnbDetKStreamer) Name() string {
+	return "BnbDetK"
 }
 
 func (d *BnbDetKStreamer) Stream(stop <-chan bool) <-chan Decomp {

@@ -90,7 +90,7 @@ func main() {
 		if gml != "" {
 			gmlSeq = gml + "_" + strconv.Itoa(i) + ".gml"
 		}
-		outputStanza("DetKStreamer", i, dec, ev, durs, originalGraph, gmlSeq, width, false)
+		outputStanza(solver.Name(), i, dec, ev, durs, originalGraph, gmlSeq, width, false)
 		fmt.Print("\n\n")
 		i++
 		if enum > 0 && i == enum {
