@@ -6,6 +6,10 @@ import (
 	"github.com/cem-okulmus/BalancedGo/lib"
 )
 
+type Streamer interface {
+	Stream(stop <-chan bool) <-chan Decomp
+}
+
 type DetKStreamer struct {
 	K     int
 	Graph lib.Graph
@@ -116,6 +120,31 @@ func (d *DetKStreamer) advance() bool {
 		d.sTree.RemoveChild()
 	}
 	return found
+}
+
+type BestDetKStreamer struct {
+	DetK *DetKStreamer
+	Ev   Evaluator
+}
+
+func (b *BestDetKStreamer) Stream(stop <-chan bool) <-chan Decomp {
+	out := make(chan Decomp)
+	go func() {
+		defer close(out)
+
+		var currDecomp Decomp
+		currCost := int(^uint(0) >> 1) // max int
+		for dec := range b.DetK.Stream(stop) {
+			cost := b.Ev.Eval(dec)
+			if cost < currCost {
+				currDecomp = dec
+				currCost = cost
+			}
+		}
+		// todo what about the stop channel?
+		out <- currDecomp
+	}()
+	return out
 }
 
 type BnbDetKStreamer struct {

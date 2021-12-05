@@ -80,6 +80,7 @@ const (
 )
 
 func (tree *SearchTree) Shrink(mode string) {
+	hg := tree.root.hg
 	nodes := tree.dfs()
 	for _, n := range nodes {
 		shrinkUp(n, mode)
@@ -88,11 +89,14 @@ func (tree *SearchTree) Shrink(mode string) {
 	for i := len(nodes) - 1; i >= 0; i-- {
 		shrinkDown(tree, nodes[i], mode)
 	}
+	tree.root.hg = hg
 }
 
 func shrinkUp(n *SearchNode, mode string) {
 	if n.parent != nil {
 		if simplify(n, n.parent, mode) {
+			//n.parent.hg = n.hg
+
 			var i int
 			if i = posOf(n, n.parent.children); i < 0 {
 				panic("n not found")
@@ -115,6 +119,8 @@ func shrinkUp(n *SearchNode, mode string) {
 func shrinkDown(tree *SearchTree, n *SearchNode, mode string) {
 	for i, child := range n.children {
 		if simplify(n, child, mode) {
+			//child.hg = n.hg
+
 			n.children[i] = n.children[len(n.children)-1]
 			n.children[len(n.children)-1] = nil
 			n.children = n.children[:len(n.children)-1]

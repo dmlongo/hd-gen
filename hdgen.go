@@ -22,6 +22,7 @@ var complete bool
 var shrink string
 var evaldb string
 var evaljoin string
+var mode string
 
 var start time.Time
 var durs []time.Duration
@@ -56,8 +57,19 @@ func main() {
 	stop := make(chan bool)
 	defer close(stop)
 
-	//solver := &DetKStreamer{K: width, Graph: hg}
-	solver := &decomp.BnbDetKStreamer{K: width, Graph: hg, Ev: ev}
+	var solver decomp.Streamer
+	switch mode {
+	case "enum":
+		solver = &decomp.DetKStreamer{K: width, Graph: hg}
+	case "best":
+		detk := &decomp.DetKStreamer{K: width, Graph: hg}
+		solver = &decomp.BestDetKStreamer{DetK: detk, Ev: ev}
+	case "bnb":
+		solver = &decomp.BnbDetKStreamer{K: width, Graph: hg, Ev: ev}
+	default:
+		panic(fmt.Errorf("mode %v unknown", mode))
+	}
+
 	fmt.Println("Starting search...")
 	i := 0
 	start = time.Now()
@@ -150,6 +162,7 @@ func setFlags() {
 
 	flagSet.StringVar(&graph, "graph", "", "Hypergraph to decompose (for format see hyperbench.dbai.tuwien.ac.at/downloads/manual.pdf)")
 	flagSet.IntVar(&width, "width", 0, "Width of the decomposition to search for (width > 0)")
+	flagSet.StringVar(&mode, "mode", "enum", "Mode of the generator (enum, best, bnb)")
 	flagSet.StringVar(&gml, "gml", "", "Output the produced decomposition into the specified gml file")
 	flagSet.IntVar(&enum, "enum", 0, "Number of decompositions to output (default => all; enum > 0 => min(all, enum))")
 	flagSet.BoolVar(&complete, "complete", false, "Forces the computation of complete decompositions")
@@ -197,6 +210,10 @@ func setFlags() {
 
 		if evaldb != "" && evaljoin != "" {
 			panic(fmt.Errorf("choose only one between evaldb and evaljoin"))
+		}
+
+		if mode != "enum" && mode != "best" && mode != "bnb" {
+			panic(fmt.Errorf("mode %v unknown, choose between enum, best, bnb", mode))
 		}
 
 		os.Exit(1)

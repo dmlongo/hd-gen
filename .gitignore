@@ -1,5 +1,7 @@
 # ignore test data
 examples/
+*.hg
+*.gml
 
 # ignore vscode debug files
 .vscode/
