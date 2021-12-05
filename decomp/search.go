@@ -7,8 +7,8 @@ import (
 )
 
 type Streamer interface {
-	Stream(stop <-chan bool) <-chan Decomp
 	Name() string
+	Stream(stop <-chan bool) <-chan Decomp
 }
 
 type DetKStreamer struct {

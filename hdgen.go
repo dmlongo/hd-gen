@@ -216,6 +216,10 @@ func setFlags() {
 			panic(fmt.Errorf("mode %v unknown, choose between enum, best, bnb", mode))
 		}
 
+		if (mode == "best" || mode == "bnb") && (evaldb == "" && evaljoin == "") {
+			panic(fmt.Errorf("mode %v requires either evaldb or evaljoin", mode))
+		}
+
 		os.Exit(1)
 	}
 }
