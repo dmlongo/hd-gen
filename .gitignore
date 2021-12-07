@@ -6,3 +6,6 @@ examples/
 # ignore vscode debug files
 .vscode/
 __debug_bin
+
+# ignore binaries
+hd-gen

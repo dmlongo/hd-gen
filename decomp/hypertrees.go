@@ -41,10 +41,9 @@ func (tree *SearchTree) MakeChild(hg Graph, sepGen *DetKSeparatorIt) *SearchNode
 	return n
 }
 
-func (tree *SearchTree) RemoveChild() {
-	n := tree.curr
-	tree.curr = n.parent
-	if n.parent == nil {
+func (tree *SearchTree) RemoveChildren() {
+	tree.curr = tree.curr.parent
+	if tree.curr == nil {
 		tree.root = nil
 	} else {
 		tree.curr.children = nil

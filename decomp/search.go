@@ -75,7 +75,7 @@ func (d *DetKStreamer) decompose(H Graph, oldSep []int) bool {
 	if found {
 		d.sTree.MoveToParent()
 	} else {
-		d.sTree.RemoveChild()
+		d.sTree.RemoveChildren()
 	}
 	return found
 }
@@ -122,7 +122,7 @@ func (d *DetKStreamer) advance() bool {
 			}
 			break
 		}
-		d.sTree.RemoveChild()
+		d.sTree.RemoveChildren()
 	}
 	return found
 }
@@ -239,7 +239,7 @@ func (d *BnbDetKStreamer) decompose(H Graph, oldSep []int) (bool, int) {
 	if found && d.Ev.EvalTree(&d.sTree) < d.currCost {
 		d.sTree.MoveToParent()
 	} else {
-		d.sTree.RemoveChild()
+		d.sTree.RemoveChildren()
 	}
 	return found, d.Ev.EvalTree(&d.sTree)
 }
