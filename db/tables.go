@@ -5,22 +5,18 @@ import (
 	"fmt"
 	"io"
 	"os"
-
-	"github.com/cem-okulmus/BalancedGo/lib"
 )
 
 // Tuple represent a row in a relation
 type Tuple []string
 type Database map[string]*Table
 
-func Load(dbPath string, graph lib.ParseGraph) (Database, map[int]string) {
-	// 1. read the csv file
+func Load(dbPath string) Database {
 	csvfile, err := os.Open(dbPath)
 	if err != nil {
 		panic(fmt.Errorf("can't open %v: %v", dbPath, err))
 	}
 
-	// 2. init map
 	db := make(Database)
 	var currName string
 	r := csv.NewReader(csvfile)
@@ -34,13 +30,13 @@ func Load(dbPath string, graph lib.ParseGraph) (Database, map[int]string) {
 			panic(err)
 		}
 
-		// 3. put the record into the map
 		kind := record[0]
 		switch kind {
 		case "r":
 			currName = record[1]
 			attrs := record[2:]
-			db[currName] = MakeTable(attrs)
+			stats := NewStatistics(attrs)
+			db[currName] = NewTable(attrs, stats)
 		case "t":
 			tup := record[1:]
 			if _, ok := db[currName].AddTuple(tup); !ok {
@@ -51,85 +47,23 @@ func Load(dbPath string, graph lib.ParseGraph) (Database, map[int]string) {
 		}
 	}
 
-	e2t := make(map[int]string)
-	for t := range db {
-		e := graph.Encoding[t]
-		e2t[e] = t
-	}
-
-	return db, e2t
+	return db
 }
 
-/*func LoadDatabasePlanning(path string, graph lib.ParseGraph) (Database, map[int]string) {
-	// 1. read the csv file
-	csvfile, err := os.Open(path)
-	if err != nil {
-		panic(fmt.Errorf("can't open %v: %v", path, err))
-	}
-
-	// 2. init map
-	db := make(Database)
-	var currName string
-	r := csv.NewReader(csvfile)
-	r.FieldsPerRecord = -1
-	for {
-		record, err := r.Read()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			panic(err)
-		}
-
-		// 3. put the record into the map
-		pred := record[0]
-		i := strings.Index(pred, "(")
-		j := strings.Index(pred, ")")
-		name := pred[:i]
-		attrs := strings.Split(pred[i+1:j], ",")
-		if _, ok := db[name]; !ok {
-			db[name] = MakeTable(attrs)
-		}
-		db[name].
-
-		//for i, j = 0, strings.Index(attrs[i:], ","); j != -1; i, j = j+1, strings.Index(attrs[i:], ",") {
-		//	a := attrs[i:j]
-		//}
-
-		switch pred {
-		case "r":
-			currName = record[1]
-			attrs := record[2:]
-			db[currName] = MakeTable(attrs)
-		case "t":
-			tup := record[1:]
-			if _, ok := db[currName].AddTuple(tup); !ok {
-				panic(fmt.Errorf("%v is not a valid tuple for %v", tup, currName))
-			}
-		default:
-			panic(fmt.Errorf("%v is not a valid type", pred))
-		}
-	}
-
-	e2t := make(map[int]string)
-	for t := range db {
-		e := graph.Encoding[t]
-		e2t[e] = t
-	}
-
-	return db, e2t
-}*/
+type RelationSchema interface {
+	Attributes() []string
+	Position(attr string) (pos int, ok bool)
+}
 
 type Table struct {
 	attrs   []string
 	attrPos map[string]int
 	tuples  []Tuple
 
-	ndv    []int
-	hgrams []Histogram
+	stats *Statistics
 }
 
-func MakeTable(attrs []string) *Table {
+func NewTable(attrs []string, stats *Statistics) *Table {
 	if len(attrs) <= 0 {
 		panic(fmt.Errorf("%v is not valid", attrs))
 	}
@@ -142,12 +76,8 @@ func MakeTable(attrs []string) *Table {
 	t.attrs = attrs
 	t.attrPos = attrPos
 	t.tuples = make([]Tuple, 0)
+	t.stats = stats
 
-	t.ndv = make([]int, len(attrs))
-	t.hgrams = make([]Histogram, len(attrs))
-	for i := range t.hgrams {
-		t.hgrams[i] = make(Histogram)
-	}
 	return &t
 }
 
@@ -168,30 +98,10 @@ func (t *Table) AddTuple(vals []string) (Tuple, bool) {
 	if len(t.attrs) != len(vals) {
 		return nil, false
 	}
-	// TODO no check if the tuple is already here
+	// duplicates allowed
 	t.tuples = append(t.tuples, vals)
-	for i, v := range vals {
-		if t.hgrams[i].Update(v) {
-			t.ndv[i]++
-		}
+	if t.stats != nil {
+		t.stats.AddTuple(vals)
 	}
 	return vals, true
-}
-
-type Histogram map[string]int
-
-func (hgram Histogram) Update(val string) bool {
-	var ok bool
-	if _, ok = hgram[val]; !ok {
-		hgram[val] = 0
-	}
-	hgram[val]++
-	return !ok
-}
-
-func (hgram Histogram) Frequency(val string) int {
-	if freq, ok := hgram[val]; ok {
-		return freq
-	}
-	return 0
 }

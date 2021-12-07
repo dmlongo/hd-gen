@@ -23,6 +23,7 @@ var shrink string
 var evaldb string
 var evaljoin string
 var mode string
+var timeout int
 
 var start time.Time
 var durs []time.Duration
@@ -42,7 +43,12 @@ func main() {
 
 	var ev decomp.Evaluator
 	if evaldb != "" {
-		db, e2t := db.Load(evaldb, parsedGraph)
+		db := db.Load(evaldb)
+		e2t := make(map[int]string)
+		for t := range db {
+			e := parsedGraph.Encoding[t]
+			e2t[e] = t
+		}
 		ev = decomp.InformedEvaluator{Db: db, Edge2Table: e2t}
 	} else if evaljoin != "" {
 		estimates := decomp.LoadEstimates(evaljoin, hg, parsedGraph.Encoding)
@@ -53,9 +59,6 @@ func main() {
 	if complete {
 		addedVertices = hg.MakeEdgesDistinct()
 	}
-
-	stop := make(chan bool)
-	defer close(stop)
 
 	var solver decomp.Streamer
 	switch mode {
@@ -68,6 +71,17 @@ func main() {
 		solver = &decomp.BnbDetKStreamer{K: width, Graph: hg, Ev: ev}
 	default:
 		panic(fmt.Errorf("mode %v unknown", mode))
+	}
+
+	stop := make(chan bool)
+	if timeout == 0 {
+		defer close(stop)
+	} else {
+		go func() {
+			<-time.After(1 * time.Second)
+			close(stop)
+			// todo problems if program ends for -enum limit before timeout
+		}()
 	}
 
 	fmt.Println("Starting search...")
@@ -169,6 +183,7 @@ func setFlags() {
 	flagSet.StringVar(&shrink, "shrink", "", "Remove redundant nodes from the produced decomposition (default => none; soft => bag,cover subsets; hard => bag subsets)")
 	flagSet.StringVar(&evaldb, "evaldb", "", "Evaluate decompositions according to a given database") // TODO
 	flagSet.StringVar(&evaljoin, "evaljoin", "", "Evaluate decompositions according to given join estimates")
+	flagSet.IntVar(&timeout, "timeout", 0, "Set a timeout in milliseconds")
 
 	parseError := flagSet.Parse(os.Args[1:])
 	if parseError != nil {

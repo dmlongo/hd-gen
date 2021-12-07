@@ -47,8 +47,7 @@ func (tree *SearchTree) RemoveChild() {
 	if n.parent == nil {
 		tree.root = nil
 	} else {
-		ch := tree.curr.children
-		tree.curr.children = tree.curr.children[:len(ch)-1]
+		tree.curr.children = nil
 	}
 	// TODO clean n, no memory waste
 }
