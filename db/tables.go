@@ -50,15 +50,15 @@ func Load(dbPath string) Database {
 	return db
 }
 
-type RelationSchema interface {
+/*type RelationSchema interface {
 	Attributes() []string
 	Position(attr string) (pos int, ok bool)
-}
+}*/
 
 type Table struct {
 	attrs   []string
 	attrPos map[string]int
-	tuples  []Tuple
+	Tuples  []Tuple
 
 	stats *Statistics
 }
@@ -75,14 +75,14 @@ func NewTable(attrs []string, stats *Statistics) *Table {
 	}
 	t.attrs = attrs
 	t.attrPos = attrPos
-	t.tuples = make([]Tuple, 0)
+	t.Tuples = make([]Tuple, 0)
 	t.stats = stats
 
 	return &t
 }
 
 func (t *Table) Size() int {
-	return len(t.tuples)
+	return len(t.Tuples)
 }
 
 func (t *Table) Attributes() []string {
@@ -99,9 +99,32 @@ func (t *Table) AddTuple(vals []string) (Tuple, bool) {
 		return nil, false
 	}
 	// duplicates allowed
-	t.tuples = append(t.tuples, vals)
+	t.Tuples = append(t.Tuples, vals)
 	if t.stats != nil {
 		t.stats.AddTuple(vals)
 	}
 	return vals, true
+}
+
+func (t *Table) RemoveTuples(idx []int) (bool, error) {
+	if len(idx) == 0 {
+		return false, nil
+	}
+
+	newSize := len(t.Tuples) - len(idx)
+	if newSize < 0 {
+		return false, fmt.Errorf("new size %v < 0", newSize)
+	}
+	newTuples := make([]Tuple, 0, newSize)
+	if newSize > 0 {
+		i := 0
+		for _, j := range idx {
+			newTuples = append(newTuples, t.Tuples[i:j]...)
+			i = j + 1
+		}
+		newTuples = append(newTuples, t.Tuples[i:]...)
+	}
+	t.Tuples = newTuples
+
+	return true, nil
 }

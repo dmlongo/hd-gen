@@ -98,6 +98,7 @@ func main() {
 		if shrink != "" {
 			tree := decomp.MakeSearchTree(dec)
 			tree.Shrink(shrink)
+			//tree.GreedyJoinOrder(ev.(decomp.InformedEvaluator))
 			dec = decomp.MakeDecomp(*tree)
 		}
 		var gmlSeq string

@@ -72,6 +72,24 @@ func (tree *SearchTree) dfs() []*SearchNode {
 	return res
 }
 
+func (tree *SearchTree) GreedyJoinOrder(ev InformedEvaluator) {
+	orderSep(tree.root, ev)
+}
+
+func orderSep(n *SearchNode, ev InformedEvaluator) {
+	tabs := ev.toTables(n.sep)
+	_, indices, _ := JoinOrder(tabs)
+	var edges []lib.Edge
+	for _, j := range indices {
+		edges = append(edges, n.sep.Slice()[j])
+	}
+	n.sep = lib.NewEdges(edges)
+
+	for _, c := range n.children {
+		orderSep(c, ev)
+	}
+}
+
 const (
 	ShrinkSoftly = "soft"
 	ShrinkHardly = "hard"
@@ -161,8 +179,9 @@ func simplify(n1 *SearchNode, n2 *SearchNode, mode string) bool {
 			// TODO if a sibling contains n1.sep, then you don't need to add
 			n2.sep = lib.NewEdges(append(n2.sep.Slice(), n1.sep.Slice()...))
 			n2.sep.RemoveDuplicates()
+			return true
 		}
-		return mode == ShrinkHardly
+		return false
 	case !bagSub && coverSub:
 		// eliminate n1, expand bag
 		n2.bag = append(n2.bag, n1.bag...)
