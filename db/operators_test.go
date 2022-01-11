@@ -19,7 +19,7 @@ const bNdv = 2 * m
 const cNdv = 1 * m
 
 func init() {
-	tab1 = NewTable([]string{"a", "b", "c"}, nil)
+	tab1 = NewTable([]string{"a", "b", "c"}, false)
 	for i := 0; i < size1; i++ {
 		tab1.AddTuple(Tuple{
 			strconv.Itoa(rand.Intn(aNdv)),
@@ -27,7 +27,7 @@ func init() {
 			strconv.Itoa(rand.Intn(cNdv)),
 		})
 	}
-	tab2 = NewTable([]string{"a", "b", "c"}, nil)
+	tab2 = NewTable([]string{"a", "b", "c"}, false)
 	for i := 0; i < size2; i++ {
 		tab2.AddTuple(Tuple{
 			strconv.Itoa(rand.Intn(aNdv)),

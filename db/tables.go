@@ -35,8 +35,7 @@ func Load(dbPath string) Database {
 		case "r":
 			currName = record[1]
 			attrs := record[2:]
-			stats := NewStatistics(attrs)
-			db[currName] = NewTable(attrs, stats)
+			db[currName] = NewTable(attrs, true)
 		case "t":
 			tup := record[1:]
 			if _, ok := db[currName].AddTuple(tup); !ok {
@@ -63,7 +62,7 @@ type Table struct {
 	stats *Statistics
 }
 
-func NewTable(attrs []string, stats *Statistics) *Table {
+func NewTable(attrs []string, stats bool) *Table {
 	if len(attrs) <= 0 {
 		panic(fmt.Errorf("%v is not valid", attrs))
 	}
@@ -76,7 +75,9 @@ func NewTable(attrs []string, stats *Statistics) *Table {
 	t.attrs = attrs
 	t.attrPos = attrPos
 	t.Tuples = make([]Tuple, 0)
-	t.stats = stats
+	if stats {
+		t.stats = NewStatistics(t.attrs)
+	}
 
 	return &t
 }
@@ -94,6 +95,10 @@ func (t *Table) Position(attr string) (pos int, ok bool) {
 	return
 }
 
+func (t *Table) Empty() bool {
+	return len(t.Tuples) == 0
+}
+
 func (t *Table) AddTuple(vals []string) (Tuple, bool) {
 	if len(t.attrs) != len(vals) {
 		return nil, false
@@ -104,6 +109,15 @@ func (t *Table) AddTuple(vals []string) (Tuple, bool) {
 		t.stats.AddTuple(vals)
 	}
 	return vals, true
+}
+
+func (t *Table) AddTuples(tuples []Tuple) bool {
+	for _, tup := range tuples {
+		if _, ok := t.AddTuple(tup); !ok {
+			return false
+		}
+	}
+	return true
 }
 
 func (t *Table) RemoveTuples(idx []int) (bool, error) {
