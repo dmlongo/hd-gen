@@ -1,8 +1,10 @@
 package decomp
 
 import (
+	"encoding/binary"
 	"encoding/csv"
 	"fmt"
+	"hash/fnv"
 	"io"
 	"os"
 	"strconv"
@@ -74,7 +76,7 @@ func findEdge(edges lib.Edges, name int) (lib.Edge, bool) {
 
 // Put the cost of an edge combination into the map
 func (se SizeEstimates) Put(edges lib.Edges, cost int) {
-	h := edges.Hash()
+	h := hashNames(edges)
 	if _, ok := se[h]; ok {
 		panic(fmt.Errorf("cost for %v already present", edges))
 	}
@@ -83,9 +85,27 @@ func (se SizeEstimates) Put(edges lib.Edges, cost int) {
 
 // Cost of an edge combination
 func (se SizeEstimates) Cost(edges lib.Edges) int {
-	h := edges.Hash()
+	h := hashNames(edges)
 	if c, ok := se[h]; ok {
 		return c
 	}
 	panic(fmt.Errorf("cost for %v not present", edges))
+}
+
+func hashNames(edges lib.Edges) uint64 {
+	var names []int
+	for _, e := range edges.Slice() {
+		names = append(names, e.Name)
+	}
+
+	var output uint64
+	for _, item := range names {
+		h := fnv.New64a()
+		bs := make([]byte, 4)
+		binary.PutVarint(bs, int64(item))
+		h.Write(bs)
+		output = output ^ h.Sum64()
+	}
+
+	return output
 }

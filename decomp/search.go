@@ -163,9 +163,9 @@ type BnbDetKStreamer struct {
 
 	cache lib.Cache
 
-	Ev         Evaluator
-	currDecomp Decomp
-	currCost   int
+	Ev            Evaluator
+	currOptDecomp Decomp
+	currOptCost   int
 }
 
 func (d *BnbDetKStreamer) Name() string {
@@ -177,20 +177,20 @@ func (d *BnbDetKStreamer) Stream(stop <-chan bool) <-chan Decomp {
 	go func() {
 		defer close(out)
 
-		d.currDecomp = Decomp{Graph: d.Graph, Root: lib.Node{Bag: d.Graph.Vertices(), Cover: d.Graph.Edges}}
-		d.currCost = d.Ev.Eval(d.currDecomp)
+		d.currOptDecomp = Decomp{Graph: d.Graph, Root: lib.Node{Bag: d.Graph.Vertices(), Cover: d.Graph.Edges}}
+		d.currOptCost = d.Ev.Eval(d.currOptDecomp)
 		select {
-		case out <- d.currDecomp:
+		case out <- d.currOptDecomp:
 		case <-stop:
 			return
 		}
 
 		d.cache.Init()
 		if found, cost := d.decompose(d.Graph, []int{}); found {
-			d.currDecomp = MakeDecomp(d.sTree)
-			d.currCost = cost
+			d.currOptDecomp = MakeDecomp(d.sTree)
+			d.currOptCost = cost
 			select {
-			case out <- d.currDecomp:
+			case out <- d.currOptDecomp:
 			case <-stop:
 				return
 			}
@@ -211,12 +211,15 @@ func (d *BnbDetKStreamer) decompose(H Graph, oldSep []int) (bool, int) {
 	n := d.sTree.MakeChild(H, sepGen)
 	n.extVerts = append(H.Vertices(), oldSep...)
 	found := false
+	myCurrCost := 0
 	for n.sepGen.HasNext() {
 		n.sep = n.sepGen.Next()
-		if d.Ev.EvalNode(n) > d.currCost {
+		n.bag = lib.Inter(n.sep.Vertices(), n.extVerts) // line should be here if we consider bag cost
+		myCurrCost = d.Ev.EvalNode(n)
+		if myCurrCost > d.currOptCost {
+			myCurrCost = 0
 			continue
 		}
-		n.bag = lib.Inter(n.sep.Vertices(), n.extVerts) // line should go up if we consider bag cost
 		n.myComps, _, _ = H.GetComponents(n.sep)
 		if len(n.myComps) == 0 {
 			found = true
@@ -225,9 +228,11 @@ func (d *BnbDetKStreamer) decompose(H Graph, oldSep []int) (bool, int) {
 		allSubDecomp := true
 		for _, Hc := range n.myComps {
 			subDecomp, subCost := d.decompose(Hc, n.bag)
-			// todo blind spot for edges cost
-			if !subDecomp || subCost > d.currCost {
+			edgeCost := d.Ev.EvalEdge(n, d.sTree.curr)
+			myCurrCost += subCost + edgeCost
+			if !subDecomp || myCurrCost > d.currOptCost {
 				allSubDecomp = false
+				myCurrCost = 0
 				break
 			}
 		}
@@ -236,12 +241,15 @@ func (d *BnbDetKStreamer) decompose(H Graph, oldSep []int) (bool, int) {
 			break
 		}
 	}
-	if found && d.Ev.EvalTree(&d.sTree) < d.currCost {
+	if found {
 		d.sTree.MoveToParent()
 	} else {
 		d.sTree.RemoveChildren()
 	}
-	return found, d.Ev.EvalTree(&d.sTree)
+	if d.Ev.EvalTree(&d.sTree) != myCurrCost {
+		panic(fmt.Errorf("actual cost != current cost, %v != %v", d.Ev.EvalTree(&d.sTree), myCurrCost))
+	}
+	return found, myCurrCost
 }
 
 /*func (d *BnbDetKStreamer) advance() bool {
