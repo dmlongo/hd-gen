@@ -82,3 +82,62 @@ func containsTuple(tup Tuple, attrs []string, tab *Table) bool {
 	}
 	return false
 }
+
+type RelationSchema interface {
+	Attributes() []string
+	Position(attr string) (pos int, ok bool)
+}
+
+func JoinAttrs(rels ...RelationSchema) ([]string, map[string][]RelationSchema) {
+	var all []string
+	common := make(map[string][]RelationSchema)
+
+	for _, r := range rels {
+		for _, a := range r.Attributes() {
+			if _, ok := common[a]; !ok {
+				common[a] = make([]RelationSchema, 0)
+				all = append(all, a)
+			}
+			common[a] = append(common[a], r)
+		}
+	}
+
+	return all, common
+}
+
+func StatsToRels(stats ...*Statistics) []RelationSchema {
+	var rels []RelationSchema
+	for _, s := range stats {
+		rels = append(rels, s)
+	}
+	return rels
+}
+
+func RelsToStats(rels ...RelationSchema) []*Statistics {
+	var stats []*Statistics
+	for _, r := range rels {
+		stats = append(stats, r.(*Statistics))
+	}
+	return stats
+}
+
+// An IntHeap is a min-heap of ints.
+type IntHeap []int
+
+func (h IntHeap) Len() int           { return len(h) }
+func (h IntHeap) Less(i, j int) bool { return h[i] > h[j] } // increasing order
+func (h IntHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+
+func (h *IntHeap) Push(x interface{}) {
+	// Push and Pop use pointer receivers because they modify the slice's length,
+	// not just its contents.
+	*h = append(*h, x.(int))
+}
+
+func (h *IntHeap) Pop() interface{} {
+	old := *h
+	n := len(old)
+	x := old[n-1]
+	*h = old[0 : n-1]
+	return x
+}

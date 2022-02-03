@@ -18,8 +18,6 @@ type SearchNode struct {
 	bag      []int
 	myComps  []Graph
 
-	size int
-
 	parent   *SearchNode
 	children []*SearchNode
 }
@@ -30,7 +28,7 @@ type SearchTree struct {
 }
 
 func (tree *SearchTree) MakeChild(hg Graph, sepGen *DetKSeparatorIt) *SearchNode {
-	n := &SearchNode{hg: hg, sepGen: sepGen, size: -1}
+	n := &SearchNode{hg: hg, sepGen: sepGen}
 	n.parent = tree.curr
 	if tree.root == nil {
 		tree.root = n
@@ -72,12 +70,13 @@ func (tree *SearchTree) dfs() []*SearchNode {
 	return res
 }
 
-func (tree *SearchTree) GreedyJoinOrder(ev InformedEvaluator) {
+/*
+func (tree *SearchTree) GreedyJoinOrder(ev *Evaluator) {
 	orderSep(tree.root, ev)
 }
 
-func orderSep(n *SearchNode, ev InformedEvaluator) {
-	tabs := ev.toTables(n.sep)
+func orderSep(n *SearchNode, ev *Evaluator) {
+	tabs := ev.toTablesStats(n.sep)
 	_, indices, _ := JoinOrder(tabs)
 	var edges []lib.Edge
 	for _, j := range indices {
@@ -89,6 +88,7 @@ func orderSep(n *SearchNode, ev InformedEvaluator) {
 		orderSep(c, ev)
 	}
 }
+*/
 
 const (
 	ShrinkSoftly = "soft"

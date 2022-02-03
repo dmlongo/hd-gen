@@ -129,7 +129,7 @@ func (d *DetKStreamer) advance() bool {
 
 type BestDetKStreamer struct {
 	DetK *DetKStreamer
-	Ev   Evaluator
+	Ev   *Evaluator
 }
 
 func (b *BestDetKStreamer) Name() string {
@@ -163,7 +163,7 @@ type BnbDetKStreamer struct {
 
 	cache lib.Cache
 
-	Ev            Evaluator
+	Ev            *Evaluator
 	currOptDecomp Decomp
 	currOptCost   int
 }
@@ -214,7 +214,7 @@ func (d *BnbDetKStreamer) decompose(H Graph, oldSep []int) (bool, int) {
 	myCurrCost := 0
 	for n.sepGen.HasNext() {
 		n.sep = n.sepGen.Next()
-		n.bag = lib.Inter(n.sep.Vertices(), n.extVerts) // line should be here if we consider bag cost
+		n.bag = lib.Inter(n.sep.Vertices(), n.extVerts)
 		myCurrCost = d.Ev.EvalNode(n)
 		if myCurrCost > d.currOptCost {
 			myCurrCost = 0

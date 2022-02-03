@@ -41,18 +41,14 @@ func main() {
 	hg, parsedGraph := lib.GetGraph(string(dat))
 	originalGraph := hg
 
-	var ev decomp.Evaluator
+	var ev *decomp.Evaluator
 	if evaldb != "" {
 		db := db.Load(evaldb)
-		e2t := make(map[int]string)
-		for t := range db {
-			e := parsedGraph.Encoding[t]
-			e2t[e] = t
-		}
-		ev = decomp.InformedEvaluator{Db: db, Edge2Table: e2t}
+		sdb := decomp.StatsFromDB(db, hg, parsedGraph.Encoding)
+		ev = &decomp.Evaluator{StatsDB: sdb}
 	} else if evaljoin != "" {
-		estimates := decomp.LoadEstimates(evaljoin, hg, parsedGraph.Encoding)
-		ev = decomp.EstimateEvaluator{Sizes: estimates}
+		sdb := decomp.LoadStatistics(evaljoin, hg, parsedGraph.Encoding)
+		ev = &decomp.Evaluator{StatsDB: sdb}
 	}
 
 	var addedVertices []int
@@ -135,7 +131,7 @@ func sumDurations(times []time.Duration) int64 {
 	return sumTotal
 }
 
-func outputStanza(algorithm string, i int, decomp Decomp, ev decomp.Evaluator, times []time.Duration, graph Graph, gml string, K int, skipCheck bool) {
+func outputStanza(algorithm string, i int, decomp Decomp, ev *decomp.Evaluator, times []time.Duration, graph Graph, gml string, K int, skipCheck bool) {
 	fmt.Println("Used algorithm: " + algorithm)
 	fmt.Println("Result", i, "( ran with K =", K, ")\n", decomp)
 

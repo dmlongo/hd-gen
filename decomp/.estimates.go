@@ -1,10 +1,8 @@
 package decomp
 
 import (
-	"encoding/binary"
 	"encoding/csv"
 	"fmt"
-	"hash/fnv"
 	"io"
 	"os"
 	"strconv"
@@ -53,6 +51,7 @@ func LoadEstimates(path string, graph Graph, encoding map[string]int) SizeEstima
 	return res
 }
 
+/*
 func selectEdges(graph Graph, comb []int) lib.Edges {
 	var output []lib.Edge
 	for _, name := range comb {
@@ -73,6 +72,7 @@ func findEdge(edges lib.Edges, name int) (lib.Edge, bool) {
 	}
 	return lib.Edge{}, false
 }
+*/
 
 // Put the cost of an edge combination into the map
 func (se SizeEstimates) Put(edges lib.Edges, cost int) {
@@ -92,6 +92,7 @@ func (se SizeEstimates) Cost(edges lib.Edges) int {
 	panic(fmt.Errorf("cost for %v not present", edges))
 }
 
+/*
 func hashNames(edges lib.Edges) uint64 {
 	var names []int
 	for _, e := range edges.Slice() {
@@ -109,3 +110,4 @@ func hashNames(edges lib.Edges) uint64 {
 
 	return output
 }
+*/

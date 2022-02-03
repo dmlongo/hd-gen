@@ -34,7 +34,7 @@ func Join(l Table, r Table) *Table {
 		l, r = r, l
 	}
 	joinIdx := commonAttrs(l, r)
-	newAttrs := joinedAttrs(l, r)
+	newAttrs, _ := JoinAttrs(&l, &r)
 	newTab := NewTable(newAttrs, false) // todo compute stats?
 	for _, lTup := range l.Tuples {
 		for _, rTup := range r.Tuples {
@@ -86,17 +86,6 @@ func match(left Tuple, right Tuple, joinIndex [][]int) bool {
 		}
 	}
 	return true
-}
-
-func joinedAttrs(l Table, r Table) []string {
-	var res []string
-	res = append(res, l.attrs...)
-	for _, v := range r.attrs {
-		if _, found := l.attrPos[v]; !found {
-			res = append(res, v)
-		}
-	}
-	return res
 }
 
 func joinedTuple(attrs []string, lTup Tuple, rTup Tuple, rAttrPos map[string]int) Tuple {

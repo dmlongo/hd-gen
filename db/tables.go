@@ -49,17 +49,12 @@ func Load(dbPath string) Database {
 	return db
 }
 
-/*type RelationSchema interface {
-	Attributes() []string
-	Position(attr string) (pos int, ok bool)
-}*/
-
 type Table struct {
 	attrs   []string
 	attrPos map[string]int
 	Tuples  []Tuple
 
-	stats *Statistics
+	Stats *Statistics
 }
 
 func NewTable(attrs []string, stats bool) *Table {
@@ -76,7 +71,7 @@ func NewTable(attrs []string, stats bool) *Table {
 	t.attrPos = attrPos
 	t.Tuples = make([]Tuple, 0)
 	if stats {
-		t.stats = NewStatistics(t.attrs)
+		t.Stats = NewStatistics(t.attrs)
 	}
 
 	return &t
@@ -105,8 +100,8 @@ func (t *Table) AddTuple(vals []string) (Tuple, bool) {
 	}
 	// duplicates allowed
 	t.Tuples = append(t.Tuples, vals)
-	if t.stats != nil {
-		t.stats.AddTuple(vals)
+	if t.Stats != nil {
+		t.Stats.AddTuple(vals)
 	}
 	return vals, true
 }
@@ -139,6 +134,8 @@ func (t *Table) RemoveTuples(idx []int) (bool, error) {
 		newTuples = append(newTuples, t.Tuples[i:]...)
 	}
 	t.Tuples = newTuples
+
+	// TODO stats update is missing
 
 	return true, nil
 }
