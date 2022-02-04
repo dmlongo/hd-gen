@@ -25,6 +25,8 @@ func LoadStatistics(path string, graph Graph, encoding map[string]int) Statistic
 
 	// 2. init map
 	res := make(StatisticsDB)
+	var edgeCombs []lib.Edges
+
 	r := csv.NewReader(csvfile)
 	r.FieldsPerRecord = -1
 	for {
@@ -57,6 +59,10 @@ func LoadStatistics(path string, graph Graph, encoding map[string]int) Statistic
 			}
 			st, _ := res.Stats(edges)
 			st.SetSize(val)
+
+			if edges.Len() >= 2 {
+				edgeCombs = append(edgeCombs, edges)
+			}
 		case "ndv":
 			tabs := record[1 : last-1]
 			col := record[last-1]
@@ -76,14 +82,29 @@ func LoadStatistics(path string, graph Graph, encoding map[string]int) Statistic
 			st.SetNdv(v, val)
 		}
 	}
-	// todo here I can estimate ndv for combinations of tables
+
+	// estimate ndv for combinations of tables
+	for _, edges := range edgeCombs {
+		combStats, _ := res.Stats(edges)
+		oldSize := combStats.Size
+		var edgeStats []*db.Statistics
+		for _, e := range edges.Slice() {
+			eStats, _ := res.Stats(lib.NewEdges([]lib.Edge{e}))
+			edgeStats = append(edgeStats, eStats)
+		}
+		newSize, newCombStats := db.EstimateJoinSize(edgeStats)
+		if oldSize != newSize {
+			fmt.Println("new size estimate for", edges, ":", oldSize, "->", newSize)
+		}
+		res.Put(edges, newCombStats)
+	}
 
 	return res
 }
 
 func computeAttrs(graph Graph, comb []int) []string {
 	var attrs []string
-	var attrSet map[int]bool
+	attrSet := make(map[int]bool)
 	edges := selectEdges(graph, comb)
 	for _, e := range edges.Slice() {
 		for _, v := range e.Vertices {

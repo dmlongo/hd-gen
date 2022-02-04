@@ -23,8 +23,6 @@ func (qe Evaluator) EvalTree(tree *SearchTree) int {
 	for len(dfs) > 0 {
 		n, dfs = dfs[len(dfs)-1], dfs[:len(dfs)-1]
 		cost += qe.EvalNode(n)
-		// todo order children by selectivity?
-		// actually order should be irrelevant for cost
 		for _, child := range n.children {
 			cost += qe.EvalEdge(n, child)
 		}

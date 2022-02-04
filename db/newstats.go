@@ -110,7 +110,7 @@ func (s *Statistics) GetNdv(attr string) int {
 }
 
 func (s *Statistics) usesHistograms() bool { // todo column as input
-	return s.Size == len(s.Hgrams[0]) // rough way
+	return s.Size == s.Hgrams[0].Sum() // rough way
 }
 
 func classifyStatistics(stats []*Statistics) ([]*Statistics, []*Statistics) {
@@ -349,10 +349,17 @@ func naiveSemijoinStats(left *Statistics, right *Statistics) (int, *Statistics) 
 			if right.Ndv[j] < minNdv {
 				minNdv = right.Ndv[j]
 			}
+			if minNdv == 0 {
+				minNdv = 1
+			}
 			tmp *= minNdv
 			newStats.SetNdv(attr, minNdv)
 		} else {
-			tmp *= left.Ndv[i]
+			ndv := 1
+			if left.Ndv[i] > ndv {
+				ndv = left.Ndv[i]
+			}
+			tmp *= ndv
 			newStats.SetNdv(attr, left.Ndv[i])
 		}
 	}
