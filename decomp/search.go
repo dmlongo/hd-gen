@@ -60,10 +60,14 @@ func (d *DetKStreamer) decompose(H Graph, oldSep []int) bool {
 			found = true
 			break
 		}
+		if d.cache.CheckNegative(n.sep, n.myComps) {
+			break
+		}
 		allSubDecomp := true
 		for _, Hc := range n.myComps {
 			allSubDecomp = d.decompose(Hc, n.bag)
 			if !allSubDecomp {
+				d.cache.AddNegative(n.sep, Hc)
 				break
 			}
 		}
@@ -95,10 +99,14 @@ func (d *DetKStreamer) advance() bool {
 				found = true
 				break
 			}
+			if d.cache.CheckNegative(n.sep, n.myComps) {
+				break
+			}
 			allSubDecomp := true
 			for _, Hc := range n.myComps {
 				allSubDecomp = d.decompose(Hc, n.bag)
 				if !allSubDecomp {
+					d.cache.AddNegative(n.sep, Hc)
 					break
 				}
 			}
