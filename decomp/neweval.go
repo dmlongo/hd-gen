@@ -79,3 +79,73 @@ func (qe Evaluator) EvalEdge(par *SearchNode, child *SearchNode) int {
 	// I think there are smarter ways to do this
 	*/
 }
+
+func (qe Evaluator) GreedyJoinPlan(n *SearchNode) ([]lib.Edge, []*db.Statistics, []int, int) {
+	sep := n.sep.Slice()
+	var tables []*db.Statistics
+	for _, e := range sep {
+		t, _ := qe.StatsDB.Stats(lib.NewEdges([]lib.Edge{e}))
+		tables = append(tables, t)
+	}
+
+	if len(tables) <= 2 {
+		cost, _ := db.EstimateJoinSize(tables)
+		return sep, tables, []int{0, 1}[:len(tables)], cost
+	}
+
+	var eOrder []lib.Edge
+	var jOrder []*db.Statistics
+	var indices []int
+	cost := 0
+
+	choices := make(map[int]*db.Statistics)
+	for i := range tables {
+		choices[i] = tables[i]
+	}
+
+	idx1, idx2 := -1, -1
+	min := int(^uint(0) >> 1)
+	for i, t1 := range tables {
+		for j := i + 1; j < len(tables); j++ {
+			t2 := tables[j]
+			s, _ := db.EstimateJoinSize([]*db.Statistics{t1, t2})
+			if s < min {
+				min = s
+				idx1, idx2 = i, j
+			}
+		}
+	}
+	eOrder = append(eOrder, sep[idx1], sep[idx2])
+	jOrder = append(jOrder, tables[idx1], tables[idx2])
+	indices = append(indices, idx1, idx2)
+	delete(choices, idx1)
+	delete(choices, idx2)
+	cost += min
+
+	for len(choices) > 1 {
+		min = int(^uint(0) >> 1)
+		idx := -1
+		tmp := jOrder
+		for i, t := range choices {
+			tmp = append(tmp, t)
+			s, _ := db.EstimateJoinSize(tmp)
+			if s < min {
+				min = s
+				idx = i
+			}
+			tmp = tmp[:len(tmp)-1]
+		}
+		eOrder = append(eOrder, sep[idx])
+		jOrder = append(jOrder, tables[idx])
+		indices = append(indices, idx)
+		delete(choices, idx)
+		cost += min
+	}
+	for i, t := range choices {
+		eOrder = append(eOrder, sep[i])
+		jOrder = append(jOrder, t)
+		indices = append(indices, i)
+	}
+
+	return eOrder, jOrder, indices, cost
+}
